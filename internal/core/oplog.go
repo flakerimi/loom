@@ -135,6 +135,26 @@ func (w *OpWriter) WriteBatch(ops []Operation) ([]Operation, error) {
 		// Update stream head
 		tx.Exec("UPDATE streams SET head_seq = ?, updated_at = ? WHERE id = ?",
 			ops[i].Seq, ops[i].Timestamp, ops[i].StreamID)
+
+		// Upsert entity state
+		entityStatus := "active"
+		if ops[i].Type == OpDelete {
+			entityStatus = "deleted"
+		}
+		_, err = tx.Exec(`
+			INSERT INTO entities (id, space_id, path, kind, object_ref, size, mod_time, status)
+			VALUES (?, ?, ?, 'file', ?, ?, ?, ?)
+			ON CONFLICT(id, space_id) DO UPDATE SET
+				path = excluded.path,
+				object_ref = COALESCE(excluded.object_ref, entities.object_ref),
+				size = COALESCE(excluded.size, entities.size),
+				mod_time = excluded.mod_time,
+				status = excluded.status,
+				updated_at = datetime('now')`,
+			ops[i].EntityID, ops[i].SpaceID, ops[i].Path, ops[i].ObjectRef, ops[i].Meta.Size, ops[i].Timestamp, entityStatus)
+		if err != nil {
+			return nil, fmt.Errorf("upsert entity %d: %w", i, err)
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -216,10 +236,17 @@ func (r *OpReader) ReadByEntity(entityID string) ([]Operation, error) {
 	return scanOperations(rows)
 }
 
-// CountBySpace returns operation count per space since a sequence.
-func (r *OpReader) CountBySpace(streamID string, sinceSeq int64) (map[string]int, error) {
+// SpaceOpCounts holds per-type operation counts for a space.
+type SpaceOpCounts struct {
+	Created  int
+	Modified int
+	Deleted  int
+}
+
+// CountBySpace returns operation counts per space and type since a sequence.
+func (r *OpReader) CountBySpace(streamID string, sinceSeq int64) (map[string]*SpaceOpCounts, error) {
 	rows, err := r.db.Query(
-		"SELECT space_id, COUNT(*) FROM operations WHERE stream_id = ? AND seq > ? GROUP BY space_id",
+		"SELECT space_id, type, COUNT(*) FROM operations WHERE stream_id = ? AND seq > ? GROUP BY space_id, type",
 		streamID, sinceSeq,
 	)
 	if err != nil {
@@ -227,14 +254,24 @@ func (r *OpReader) CountBySpace(streamID string, sinceSeq int64) (map[string]int
 	}
 	defer rows.Close()
 
-	result := make(map[string]int)
+	result := make(map[string]*SpaceOpCounts)
 	for rows.Next() {
-		var space string
+		var space, opType string
 		var count int
-		if err := rows.Scan(&space, &count); err != nil {
+		if err := rows.Scan(&space, &opType, &count); err != nil {
 			return nil, err
 		}
-		result[space] = count
+		if result[space] == nil {
+			result[space] = &SpaceOpCounts{}
+		}
+		switch OpType(opType) {
+		case OpCreate:
+			result[space].Created = count
+		case OpDelete:
+			result[space].Deleted = count
+		default:
+			result[space].Modified += count
+		}
 	}
 	return result, nil
 }

@@ -129,6 +129,61 @@ func TestVault_EntityCount(t *testing.T) {
 	}
 }
 
+func TestInitVault_NoDoubleTrackSubspaces(t *testing.T) {
+	dir := t.TempDir()
+
+	os.MkdirAll(filepath.Join(dir, "docs"), 0755)
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main"), 0644)
+	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module test"), 0644)
+	os.WriteFile(filepath.Join(dir, "docs", "readme.md"), []byte("# Hello"), 0644)
+
+	vault, err := InitVault(dir)
+	if err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	defer vault.Close()
+
+	// readme.md should only be in docs, not in code
+	var count int
+	err = vault.DB.QueryRow("SELECT COUNT(*) FROM entities WHERE path = 'docs/readme.md' AND space_id = 'code'").Scan(&count)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if count != 0 {
+		t.Error("docs/readme.md should NOT be tracked in the code space")
+	}
+
+	err = vault.DB.QueryRow("SELECT COUNT(*) FROM entities WHERE path = 'readme.md' AND space_id = 'docs'").Scan(&count)
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if count != 1 {
+		t.Error("readme.md should be tracked in the docs space")
+	}
+}
+
+func TestInitVault_WithName(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(filepath.Join(dir, "main.go"), []byte("package main"), 0644)
+
+	vault, err := InitVault(dir, WithName("Custom Project"))
+	if err != nil {
+		t.Fatalf("init: %v", err)
+	}
+	vault.Close()
+
+	// Reopen and verify name is persisted
+	v2, err := OpenVault(dir)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer v2.Close()
+
+	if v2.Config.Project.Name != "Custom Project" {
+		t.Errorf("expected project name 'Custom Project', got %q", v2.Config.Project.Name)
+	}
+}
+
 func TestFindLoomDir_WalkUp(t *testing.T) {
 	dir := t.TempDir()
 

@@ -42,9 +42,10 @@ func newStatusCmd() *cobra.Command {
 			if len(counts) > 0 {
 				fmt.Fprintln(cmd.OutOrStdout(), "\nSpaces:")
 				for spaceID, count := range counts {
-					changed := changedCounts[spaceID]
-					if changed > 0 {
-						fmt.Fprintf(cmd.OutOrStdout(), "  %-10s %4d entities   %d changed since checkpoint\n", spaceID, count, changed)
+					oc := changedCounts[spaceID]
+					if oc != nil {
+						total := oc.Created + oc.Modified + oc.Deleted
+						fmt.Fprintf(cmd.OutOrStdout(), "  %-10s %4d entities   %d changed since checkpoint\n", spaceID, count, total)
 					} else {
 						fmt.Fprintf(cmd.OutOrStdout(), "  %-10s %4d entities   0 changed\n", spaceID, count)
 					}
@@ -53,8 +54,8 @@ func newStatusCmd() *cobra.Command {
 
 			// Pending ops
 			totalPending := 0
-			for _, c := range changedCounts {
-				totalPending += c
+			for _, oc := range changedCounts {
+				totalPending += oc.Created + oc.Modified + oc.Deleted
 			}
 			if totalPending > 0 {
 				fmt.Fprintf(cmd.OutOrStdout(), "\n%d operations since last checkpoint\n", totalPending)

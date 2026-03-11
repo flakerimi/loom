@@ -22,6 +22,18 @@ const (
 
 var ErrNotInit = errors.New("not a loom project (run 'loom init')")
 
+// InitOption configures vault initialization.
+type InitOption func(*initOptions)
+
+type initOptions struct {
+	name string
+}
+
+// WithName sets a custom project name (instead of the directory basename).
+func WithName(name string) InitOption {
+	return func(o *initOptions) { o.name = name }
+}
+
 // Vault represents an initialized Loom project.
 type Vault struct {
 	ProjectPath string
@@ -36,7 +48,8 @@ type Vault struct {
 }
 
 // InitVault initializes a new Loom project at the given path.
-func InitVault(projectPath string) (*Vault, error) {
+// Optional opts can override defaults (e.g. project name).
+func InitVault(projectPath string, opts ...InitOption) (*Vault, error) {
 	absPath, err := filepath.Abs(projectPath)
 	if err != nil {
 		return nil, fmt.Errorf("resolve path: %w", err)
@@ -75,6 +88,12 @@ func InitVault(projectPath string) (*Vault, error) {
 		return nil, fmt.Errorf("init object store: %w", err)
 	}
 
+	// Apply options
+	var o initOptions
+	for _, opt := range opts {
+		opt(&o)
+	}
+
 	// Detect author from git config
 	author := detectAuthor()
 
@@ -82,9 +101,13 @@ func InitVault(projectPath string) (*Vault, error) {
 	spaces := detectSpaces(absPath)
 
 	// Build config
+	projectName := filepath.Base(absPath)
+	if o.name != "" {
+		projectName = o.name
+	}
 	cfg := &ProjectConfig{
 		Project: ProjectInfo{
-			Name:    filepath.Base(absPath),
+			Name:    projectName,
 			Version: 1,
 		},
 		Author: author,
@@ -233,6 +256,14 @@ func (v *Vault) EntityCount() (map[string]int, error) {
 
 // scanEntities performs initial scan of all spaces and records entities.
 func (v *Vault) scanEntities(stream *Stream) int {
+	// Collect subspace paths so the root code space can exclude them.
+	subspacePaths := make(map[string]bool)
+	for _, spaceCfg := range v.Config.Spaces {
+		if spaceCfg.Path != "." {
+			subspacePaths[spaceCfg.Path] = true
+		}
+	}
+
 	total := 0
 	for spaceID, spaceCfg := range v.Config.Spaces {
 		spacePath := filepath.Join(v.ProjectPath, spaceCfg.Path)
@@ -240,7 +271,15 @@ func (v *Vault) scanEntities(stream *Stream) int {
 			continue
 		}
 
-		entities := scanDirectory(spacePath, spaceID, v.Config.Watch.Ignore)
+		// For root-scoped spaces (path "."), exclude directories owned by other spaces.
+		var excludeDirs []string
+		if spaceCfg.Path == "." {
+			for p := range subspacePaths {
+				excludeDirs = append(excludeDirs, p)
+			}
+		}
+
+		entities := scanDirectory(spacePath, spaceID, v.Config.Watch.Ignore, excludeDirs)
 		for _, e := range entities {
 			// Read content and store in object store
 			fullPath := filepath.Join(spacePath, e.Path)
@@ -276,15 +315,24 @@ func (v *Vault) scanEntities(stream *Stream) int {
 }
 
 // scanDirectory walks a directory and returns entity states.
-func scanDirectory(root, spaceID string, ignoreRules []string) []EntityState {
+// excludeDirs is a list of relative directory paths to skip (used to prevent
+// the root code space from double-tracking nested subspace content).
+func scanDirectory(root, spaceID string, ignoreRules, excludeDirs []string) []EntityState {
 	var entities []EntityState
 
 	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
-			// Check if directory should be ignored
 			if info != nil && info.IsDir() {
+				// Check ignore rules
 				for _, rule := range ignoreRules {
 					if matched, _ := filepath.Match(rule, info.Name()); matched {
+						return filepath.SkipDir
+					}
+				}
+				// Check excluded subspace dirs
+				rel, _ := filepath.Rel(root, path)
+				for _, ex := range excludeDirs {
+					if rel == ex {
 						return filepath.SkipDir
 					}
 				}

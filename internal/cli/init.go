@@ -20,15 +20,16 @@ func newInitCmd() *cobra.Command {
 				path = args[0]
 			}
 
-			vault, err := core.InitVault(path)
+			var opts []core.InitOption
+			if name != "" {
+				opts = append(opts, core.WithName(name))
+			}
+
+			vault, err := core.InitVault(path, opts...)
 			if err != nil {
 				return err
 			}
 			defer vault.Close()
-
-			if name != "" {
-				vault.Config.Project.Name = name
-			}
 
 			fmt.Fprintf(cmd.OutOrStdout(), "Initialized Loom in %s\n", vault.ProjectPath)
 

@@ -153,6 +153,41 @@ func TestCheckpointEngine_Search(t *testing.T) {
 	}
 }
 
+func TestCheckpointEngine_SpaceSummaryBreakdown(t *testing.T) {
+	engine, writer, stream := setupCheckpointEnv(t)
+
+	writer.Write(Operation{StreamID: stream.ID, SpaceID: "code", EntityID: "a.go", Type: OpCreate, Path: "a.go", Author: "test"})
+	writer.Write(Operation{StreamID: stream.ID, SpaceID: "code", EntityID: "b.go", Type: OpCreate, Path: "b.go", Author: "test"})
+	writer.Write(Operation{StreamID: stream.ID, SpaceID: "code", EntityID: "a.go", Type: OpModify, Path: "a.go", Author: "test"})
+	writer.Write(Operation{StreamID: stream.ID, SpaceID: "code", EntityID: "c.go", Type: OpCreate, Path: "c.go", Author: "test"})
+	writer.Write(Operation{StreamID: stream.ID, SpaceID: "code", EntityID: "b.go", Type: OpDelete, Path: "b.go", Author: "test"})
+
+	cp, err := engine.Create(CheckpointInput{
+		StreamID: stream.ID,
+		Title:    "mixed ops",
+		Author:   "test",
+		Source:   SourceManual,
+	})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	if len(cp.Spaces) != 1 {
+		t.Fatalf("expected 1 space, got %d", len(cp.Spaces))
+	}
+
+	s := cp.Spaces[0]
+	if s.Summary.EntitiesCreated != 3 {
+		t.Errorf("created: expected 3, got %d", s.Summary.EntitiesCreated)
+	}
+	if s.Summary.EntitiesModified != 1 {
+		t.Errorf("modified: expected 1, got %d", s.Summary.EntitiesModified)
+	}
+	if s.Summary.EntitiesDeleted != 1 {
+		t.Errorf("deleted: expected 1, got %d", s.Summary.EntitiesDeleted)
+	}
+}
+
 func TestCheckpointEngine_ParentChain(t *testing.T) {
 	engine, _, stream := setupCheckpointEnv(t)
 

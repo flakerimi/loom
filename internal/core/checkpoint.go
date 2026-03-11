@@ -44,16 +44,20 @@ func (ce *CheckpointEngine) Create(input CheckpointInput) (*Checkpoint, error) {
 		input.StreamID,
 	).Scan(&parentID, &parentSeq)
 
-	// Count ops per space since last checkpoint
+	// Count ops per space and type since last checkpoint
 	spaceCounts, _ := ce.reader.CountBySpace(input.StreamID, parentSeq)
 
 	// Build space states
 	var spaces []SpaceState
-	for spaceID, count := range spaceCounts {
+	for spaceID, counts := range spaceCounts {
 		spaces = append(spaces, SpaceState{
 			SpaceID: spaceID,
 			Status:  SpaceChanged,
-			Summary: SpaceSummary{EntitiesModified: count},
+			Summary: SpaceSummary{
+				EntitiesCreated:  counts.Created,
+				EntitiesModified: counts.Modified,
+				EntitiesDeleted:  counts.Deleted,
+			},
 		})
 	}
 
