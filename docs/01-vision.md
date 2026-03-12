@@ -16,7 +16,7 @@ Git was designed in 2005 for the Linux kernel. It solved version control for tex
 - Manual commits create gaps in history. The time between commits is a black hole — work is lost, context disappears.
 - Branch management is ceremony. Most branching workflows exist to work around Git's limitations, not because they add value.
 
-Git is infrastructure that won't go away. Loom doesn't replace Git for code hosting, CI/CD, or code review. Loom adds a higher layer: a universal versioning system that can wrap Git for code while extending the same versioning model to everything else.
+Loom is a ground-up reinvention of version control. It doesn't borrow Git's model, vocabulary, or limitations. Git didn't clone SVN — Loom doesn't clone Git.
 
 ## Design Pillars
 
@@ -40,7 +40,7 @@ Git is infrastructure that won't go away. Loom doesn't replace Git for code host
 | Scope | Single repository | Multi-space project (code + docs + design + ...) |
 | Audience | Humans typing in terminals | Humans + AI agents + automation |
 | Diff | Line-based text diff | Semantic diff per content type |
-| Remote | git push/pull/fetch | Stream sync (push/pull operations) |
+| Remote | git push/pull/fetch | Stream sync (send/receive operations) |
 | Auto-save | None | Continuous auto-checkpointing |
 
 ## Core Concepts
@@ -91,14 +91,14 @@ Built-in spaces:
 
 Custom spaces can be registered via adapters.
 
-### Remotes
+### Hubs
 
-A remote is a Loom server that stores streams. Like `git remote`, but for the entire project across all spaces.
+A hub is a remote Loom server that stores and syncs streams. Add a hub and send/receive operations.
 
 ```
-loom remote add origin https://loom.example.com/project/my-app
-loom push
-loom pull
+loom hub add origin https://loomhub.dev/flakerimi/my-app
+loom send
+loom receive
 ```
 
 ## Product Shape
@@ -110,12 +110,18 @@ From the user's perspective:
 3. **Checkpoint** — Optionally name a point: `loom checkpoint "auth system complete"`.
 4. **Browse** — `loom log` shows the timeline. `loom diff` shows what changed. Filter by space, author, time.
 5. **Restore** — `loom restore <checkpoint>` restores any point. By space, by entity, or the whole project.
-6. **Collaborate** — `loom push` / `loom pull` to sync with remotes. No merge conflicts.
+6. **Collaborate** — `loom send` / `loom receive` to sync with hubs. No merge conflicts.
 7. **Agent** — AI agents call the Loom API directly. `loom.checkpoint("before refactor")`, `loom.rollback(id)`.
+
+## What Loom Is
+
+- **A versioning system** — replaces Git with operation-based, multi-space versioning
+- **A sync engine** — replaces Google Drive-style sync with automatic, continuous collaboration
+- **A timeline system** — every change is recorded, undo/redo at any granularity
+- **An embeddable SDK** — integrate Loom inside any app for built-in versioning and history
 
 ## What Loom Is Not
 
-- Not a Git replacement for code hosting (use GitHub/GitLab for that)
 - Not a real-time collaboration tool (v1 — that's v2+ with CRDTs)
 - Not a backup system (though it can serve as one)
 - Not a deployment tool
