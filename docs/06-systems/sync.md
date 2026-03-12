@@ -23,8 +23,8 @@ Loom's sync protocol enables sending and receiving operations between a local pr
 | Method | Path | Purpose |
 |--------|------|---------|
 | POST | `/api/v1/negotiate` | Find common ancestor, plan sync |
-| POST | `/api/v1/push` | Send operations and objects to hub |
-| POST | `/api/v1/pull` | Receive operations and objects from hub |
+| POST | `/api/v1/push` | Send operations and objects to hub (`loom send`) |
+| POST | `/api/v1/pull` | Receive operations and objects from hub (`loom receive`) |
 | GET | `/api/v1/project/:id/info` | Get project metadata |
 | GET | `/api/v1/project/:id/streams` | List streams |
 | GET | `/api/v1/project/:id/log` | Get checkpoint log |
@@ -56,7 +56,7 @@ type NegotiateResponse struct {
 }
 ```
 
-### Send (Push)
+### Send
 
 ```go
 // Client sends operations and referenced objects to hub
@@ -82,7 +82,7 @@ type PushResponse struct {
 }
 ```
 
-### Receive (Pull)
+### Receive
 
 ```go
 // Client requests operations from hub

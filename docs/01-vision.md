@@ -24,7 +24,7 @@ Loom is a ground-up reinvention of version control. It doesn't borrow Git's mode
 2. **Intelligent** — No merge conflicts. Concurrent changes converge automatically via CRDTs (v2) or are resolved by LLM agents. Conflicts become suggestions, not blockers.
 3. **Universal** — One system for code, docs, design, data, configs, notes, and anything else. Space adapters normalize different content types into a shared model.
 4. **Agent-First** — LLM agents are first-class citizens. Structured API for versioning, diffing, rolling back, and explaining changes. Agents can version their own work.
-5. **Collaborative** — Client-server architecture. Push and pull streams to remotes. Real-time sync in the future.
+5. **Collaborative** — Client-server architecture. Send and receive streams to remotes. Real-time sync in the future.
 6. **Local-First** — All data lives locally. Remotes are optional. Works offline. Your data is yours.
 
 ## How It's Different
