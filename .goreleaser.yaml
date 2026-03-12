@@ -1,0 +1,36 @@
+version: 2
+
+builds:
+  - id: loom
+    main: ./cmd/loom
+    binary: loom
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - darwin
+      - linux
+    goarch:
+      - arm64
+      - amd64
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.ShortCommit}}
+
+archives:
+  - id: default
+    formats: ['tar.gz']
+    name_template: "loom_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+
+release:
+  github:
+    owner: LoomHubDev
+    name: loom

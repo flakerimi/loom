@@ -6,8 +6,15 @@ import (
 	"github.com/constructspace/loom/internal/cli"
 )
 
+var (
+	version = "dev"
+	commit  = "none"
+)
+
 func main() {
-	if err := cli.NewRootCmd().Execute(); err != nil {
+	cmd := cli.NewRootCmd()
+	cmd.Version = version + " (" + commit + ")"
+	if err := cmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
